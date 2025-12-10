@@ -1,0 +1,140 @@
+{{- if and .Values.query.enabled .Values.queryInternal.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "thanos.queryInternal.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "thanos.queryInternal.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.queryInternal.replicas }}
+  {{- with .Values.query.updateStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "thanos.queryInternal.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "thanos.queryInternal.selectorLabels" . | nindent 8 }}
+      {{- with .Values.query.podLabels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.query.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "thanos.query.serviceAccountName" . }}
+    {{- if ne .Values.query.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.query.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.query.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.query.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+    {{- end }}
+    {{- with .Values.query.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ . }}
+    {{- end }}
+      containers:
+        - name: thanos-query
+          {{- with .Values.query.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "thanos.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: HOST_IP_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          {{- with .Values.query.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - query
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--grpc-address=0.0.0.0:%d" (int .Values.query.grpcPort) }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.query.httpPort) }}
+          {{- if .Values.autoGomemlimit.enabled }}
+            - --enable-auto-gomemlimit
+          {{- with .Values.autoGomemlimit.ratio }}
+            - {{ printf "--auto-gomemlimit.ratio=%s" . }}
+          {{- end }}
+          {{- end }}
+          {{- range (concat .Values.additionalReplicaLabels .Values.query.replicaLabels (ternary (list "rule_replica") (list) .Values.rule.enabled ) (ternary (list "receive_replica") (list) .Values.receive.enabled )) | uniq }}
+            - {{ printf "--query.replica-label=%s" . }}
+          {{- end }}
+          {{- if .Values.query.enableDnsDiscovery }}
+          {{- if .Values.storeGateway.enabled }}
+            - {{ printf "--endpoint%s=dnssrv+_grpc._tcp.%s-headless.%s.svc.%s" (ternary "-group" "" .Values.storeEndpointGroup) (include "thanos.storeGateway.fullname" .) .Release.Namespace .Values.clusterDomain}}
+          {{- end }}
+          {{- if .Values.rule.enabled }}
+            - {{ printf "--endpoint=dnssrv+_grpc._tcp.%s-headless.%s.svc.%s" (include "thanos.rule.fullname" .) .Release.Namespace .Values.clusterDomain}}
+          {{- end }}
+          {{- if .Values.receive.enabled }}
+            - {{ printf "--endpoint=dnssrv+_grpc._tcp.%s-headless.%s.svc.%s" (include "thanos.receive.ingestor.fullname" .) .Release.Namespace .Values.clusterDomain}}
+          {{- end }}
+          {{- end }}
+          {{- range (concat .Values.additionalEndpoints .Values.query.additionalStores) | uniq }}
+            - {{ printf "--endpoint=%s" (tpl . $) }}
+          {{- end }}
+          {{- range .Values.additionalEndpointGroups }}
+            - {{ printf "--endpoint-group=%s" (tpl . $) }}
+          {{- end }}
+          {{- with .Values.queryInternal.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: grpc
+              protocol: TCP
+              containerPort: {{ .Values.query.grpcPort }}
+            - name: http
+              protocol: TCP
+              containerPort: {{ .Values.query.httpPort }}
+          livenessProbe:
+            {{- toYaml .Values.query.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.query.readinessProbe | nindent 12 }}
+          {{- with .Values.query.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (default .Values.query.resources .Values.queryInternal.resources) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.query.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.query.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.query.affinity }}
+      {{- $_ := include "thanos.queryInternal.patchAffinity" $ }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.query.topologySpreadConstraints }}
+      {{- $_ := include "thanos.queryInternal.patchTopologySpreadConstraints" $ }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.query.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

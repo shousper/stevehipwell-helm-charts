@@ -1,0 +1,30 @@
+{{- if and .Values.query.enabled .Values.queryInternal.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "thanos.queryInternal.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "thanos.queryInternal.labels" . | nindent 4 }}
+  {{- with .Values.query.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+{{- if (semverCompare ">= 1.31-0" .Capabilities.KubeVersion.Version) }}
+{{- with .Values.query.service.trafficDistribution }}
+  trafficDistribution: {{ . }}
+{{- end }}
+{{- end }}
+  ports:
+    - name: grpc
+      port: {{ .Values.query.service.grpcPort }}
+      targetPort: grpc
+    - name: http
+      protocol: TCP
+      port: {{ .Values.query.service.httpPort }}
+      targetPort: http
+  selector:
+    {{- include "thanos.queryInternal.selectorLabels" . | nindent 4 }}
+{{- end }}

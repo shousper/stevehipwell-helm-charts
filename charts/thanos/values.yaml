@@ -404,6 +404,41 @@ query:
   # -- Node taints the _Query_ pod will tolerate for scheduling.
   tolerations: []
 
+# Query Internal - Thanos Query without tenant enforcement
+# Used by Rule component for cross-tenant recording rules
+queryInternal:
+  # -- If `true`, create the _Query Internal_ component.
+  # Requires query.enabled to also be true.
+  enabled: false
+
+  # -- Number of _Query Internal_ replicas.
+  replicas: 2
+
+  # -- Additional args for _Query Internal_.
+  # Note: --query.enforce-tenancy is NOT added to this component.
+  extraArgs: []
+
+  # -- Resources for the _Query Internal_ pod.
+  resources: {}
+  #   limits:
+  #     memory: 1Gi
+  #   requests:
+  #     memory: 256Mi
+
+  service:
+    # -- Annotations to add to the _Query Internal_ service.
+    annotations: {}
+
+  serviceMonitor:
+    # -- If `true`, create a `ServiceMonitor` for _Query Internal_.
+    enabled: false
+    # -- Additional labels for the _Query Internal_ `ServiceMonitor`.
+    additionalLabels: {}
+    # -- Relabelings for the _Query Internal_ `ServiceMonitor`.
+    relabelings: []
+    # -- Metric relabelings for the _Query Internal_ `ServiceMonitor`.
+    metricRelabelings: []
+
 queryFrontend:
   # -- If `true`, create the _Query Frontend_ component if the _Query_ component is also enabled.
   enabled: false
@@ -916,6 +951,14 @@ receive:
 rule:
   # -- If `true`, create the _Thanos Rule_ component.
   enabled: false
+
+  # -- Query endpoints for Rule to use. When set, these REPLACE the auto-generated
+  # query endpoint (not additive). Use DNS SRV format for discovery.
+  # When empty, falls back to auto-adding query endpoint if query.enabled is true.
+  queryEndpoints: []
+  # Example:
+  # queryEndpoints:
+  #   - "dnssrv+_http._tcp.thanos-query-internal.monitoring.svc.cluster.local"
 
   # -- If `true`, add a `thanos_rule` label to `<NAMESPACE>/<RULE_FULLNAME>` on a `Rule` metrics.
   instanceLabel: false

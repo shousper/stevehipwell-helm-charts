@@ -182,3 +182,47 @@ Patch pod affinity
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Query Internal fullname
+*/}}
+{{- define "thanos.queryInternal.fullname" -}}
+{{ include "thanos.fullname" . }}-query-internal
+{{- end }}
+
+{{/*
+Query Internal labels
+*/}}
+{{- define "thanos.queryInternal.labels" -}}
+{{ include "thanos.labels" . }}
+app.kubernetes.io/component: query-internal
+{{- end }}
+
+{{/*
+Query Internal selector labels
+*/}}
+{{- define "thanos.queryInternal.selectorLabels" -}}
+{{ include "thanos.selectorLabels" . }}
+app.kubernetes.io/component: query-internal
+{{- end }}
+
+{{/*
+Query Internal patch affinity
+*/}}
+{{- define "thanos.queryInternal.patchAffinity" -}}
+{{- if (hasKey .Values.query.affinity "podAffinity") }}
+{{- include "thanos.patchPodAffinity" (merge (dict "_podAffinity" .Values.query.affinity.podAffinity "_selectorLabelsTemplate" "thanos.queryInternal.selectorLabels") .) }}
+{{- end }}
+{{- if (hasKey .Values.query.affinity "podAntiAffinity") }}
+{{- include "thanos.patchPodAffinity" (merge (dict "_podAffinity" .Values.query.affinity.podAntiAffinity "_selectorLabelsTemplate" "thanos.queryInternal.selectorLabels") .) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Query Internal patch topology spread constraints
+*/}}
+{{- define "thanos.queryInternal.patchTopologySpreadConstraints" -}}
+{{- range $constraint := .Values.query.topologySpreadConstraints }}
+{{- include "thanos.patchLabelSelector" (merge (dict "_target" $constraint "_selectorLabelsTemplate" "thanos.queryInternal.selectorLabels") $) }}
+{{- end }}
+{{- end }}
