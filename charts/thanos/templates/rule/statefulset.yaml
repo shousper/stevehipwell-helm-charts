@@ -105,7 +105,7 @@ spec:
           {{- else if .Values.query.enabled }}
             - {{ printf "--query=dnssrv+_http._tcp.%s.%s.svc.%s" (include "thanos.query.fullname" .) .Release.Namespace .Values.clusterDomain }}
           {{- end }}
-            - --rule-file=/etc/thanos/rules/*.yaml
+            - --rule-file={{ .Values.rule.ruleFilePattern | default "/etc/thanos/rules/*.yaml" }}
             - --eval-interval={{ .Values.rule.evalInterval }}
             - --alertmanagers.config-file=/etc/thanos/alertmanagers-config.yaml
           {{- if eq (include "thanos.queryIngress.enabled" .) "true" }}
@@ -134,9 +134,11 @@ spec:
               name: alertmanagers-config
               subPath: {{ .Values.rule.alertmanagersConfig.key }}
               readOnly: true
+          {{- if or .Values.rule.rules.create .Values.rule.rules.name }}
             - mountPath: /etc/thanos/rules
               name: rules
               readOnly: true
+          {{- end }}
             - mountPath: /var/thanos/rule
               name: data
               readOnly: false
@@ -152,11 +154,18 @@ spec:
           image: {{ include "thanos.configReloaderImage" . }}
           args:
             - {{ printf "--webhook-url=http://localhost:%d/-/reload" (int .Values.rule.httpPort) }}
+          {{- if or .Values.rule.rules.create .Values.rule.rules.name }}
             - -volume-dir=/etc/thanos/rules
+          {{- end }}
+          {{- with .Values.rule.configReloader.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
+          {{- if or .Values.rule.rules.create .Values.rule.rules.name }}
             - mountPath: /etc/thanos/rules
               name: rules
               readOnly: true
+          {{- end }}
           {{- with .Values.rule.configReloader.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -172,9 +181,11 @@ spec:
         - name: alertmanagers-config
           secret:
             secretName: {{ include "thanos.rule.alertmanagersConfigSecretName" . }}
+      {{- if or .Values.rule.rules.create .Values.rule.rules.name }}
         - name: rules
           configMap:
             name: {{ include "thanos.rule.rulesConfigmapName" . }}
+      {{- end }}
       {{- if not .Values.rule.persistence.enabled }}
         - name: data
           emptyDir: {}

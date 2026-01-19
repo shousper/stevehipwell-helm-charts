@@ -943,8 +943,14 @@ rule:
     value: |-
       alertmanagers: []
 
+  # -- Glob pattern for rule files. Supports recursive patterns like "/etc/thanos/rules/**/*.yaml".
+  # When using extraVolumes with projected ConfigMaps, set rules.create=false and configure this pattern.
+  ruleFilePattern: "/etc/thanos/rules/*.yaml"
+
   rules:
     # -- If `true`, create a `ConfigMap` for the _Rule_ component rules.
+    # When `false` and `name` is not set, the default rules volume is not mounted,
+    # allowing full control via extraVolumes and ruleFilePattern.
     create: true
     # -- (string) If this is set and `rule.rules.create` is `true` this will be used for the created config map name, if this is set and `rule.rules.create` is `false` then this will define an existing config map to use.
     name:
@@ -1125,6 +1131,8 @@ rule:
       pullPolicy: IfNotPresent
     # -- Resources for the _Rule_ pod config reloader sidecar container.
     resources: {}
+    # -- Extra args for the _Rule_ pod config reloader sidecar container (e.g., additional -volume-dir flags).
+    extraArgs: []
     # -- Extra volume mounts for the _Rule_ pod config reloader sidecar container.
     extraVolumeMounts: []
 
